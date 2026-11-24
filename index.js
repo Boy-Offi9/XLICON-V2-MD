@@ -167,6 +167,20 @@ function loadPlugins() {
     return plugins;
 }
 
+function reloadPlugins(plugins) {
+    // Clear only plugin module entries from the require cache, then reload
+    const pluginPath = path.join(__dirname, PLUGIN_FOLDER);
+    for (const key of Object.keys(require.cache)) {
+        if (key.startsWith(pluginPath + path.sep) && key.endsWith('.js')) {
+            delete require.cache[key];
+        }
+    }
+    const fresh = loadPlugins();
+    plugins.clear();
+    for (const [k, v] of fresh) plugins.set(k, v);
+    return plugins;
+}
+
 async function startBot() {
     console.log('Starting WhatsApp Bot...');
     isConnecting = true;
@@ -387,6 +401,28 @@ async function startBot() {
                     const args = m.body.slice(global.BOT_PREFIX.length).trim().split(/\s+/);
                     const commandName = args.shift().toLowerCase();
                     const plugin = plugins.get(commandName);
+
+                    if (commandName === 'reload') {
+                        const owners = Array.isArray(global.owners) ? global.owners : [];
+                        const senderJid = String(m.sender || '');
+                        const senderNum = senderJid.split(':')[0].split('@')[0];
+                        const isOwner = m.key?.fromMe || owners.some(o => {
+                            const oNorm = String(o).split(':')[0].split('@')[0];
+                            return oNorm === senderNum || String(o) === senderJid;
+                        });
+                        if (!isOwner) {
+                            try { await m.reply('Owner only command.'); } catch (e) {}
+                        } else {
+                            try {
+                                reloadPlugins(plugins);
+                                try { await m.reply('Plugins reloaded.'); } catch (e) {}
+                            } catch (err) {
+                                console.error('Reload error:', err);
+                                try { await m.reply('Reload failed.'); } catch (e) {}
+                            }
+                        }
+                        continue;
+                    }
             
                     if (plugin) {
                         try {
