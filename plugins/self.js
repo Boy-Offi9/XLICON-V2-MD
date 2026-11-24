@@ -1,3 +1,5 @@
+const { checkOwner } = require('../lib/auth');
+
 let selfMode = false;
 
 module.exports = {
@@ -7,7 +9,7 @@ module.exports = {
     async execute(sock, m, args) {
          
             await m.react('⚙️');
-        if (!global.owners.includes(m.sender)) {
+        if (!checkOwner(m.sender || '', sock?.user)) {
             return;
         }
         
@@ -27,9 +29,9 @@ module.exports = {
     async onMessage(sock, m) {
         if (!selfMode) return false;
         
-        let botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        let botNumber = normalizeJid(sock.user?.id || sock.user?.lid || '');
         
-        if (global.owners.includes(m.sender) || m.sender === botNumber) return false;
+        if (checkOwner(m.sender || '', sock?.user) || m.sender === botNumber) return false;
         
         if (m.body && m.body.startsWith(global.BOT_PREFIX)) {
             return true;
