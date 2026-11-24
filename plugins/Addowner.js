@@ -1,3 +1,4 @@
+const { normalizeJid, checkOwner } = require('../lib/auth');
 const fs = require('fs');
 const path = require('path');
 
@@ -61,12 +62,10 @@ module.exports = {
         }
 
         const sender = m.sender || '';
-        const senderNumber = sender.split('@')[0].split(':')[0];
-        const botNumber = sock.user?.id?.split('@')[0]?.split(':')[0];
+        const senderNumber = normalizeJid(sender).split('@')[0];
+        const botNumber = normalizeJid(sock.user?.id || sock.user?.lid || '').split('@')[0];
 
-        const isOwner = m.isOwner ||
-            senderNumber === botNumber ||
-            (global.owners || []).some(o => o.split('@')[0].split(':')[0] === senderNumber);
+        const isOwner = checkOwner(sender, sock?.user);
 
         if (!isOwner) {
             return m.reply('❌ Only owners can use this command.');
