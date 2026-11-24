@@ -97,9 +97,9 @@ module.exports = {
                 targetParticipant.phoneNumber?.split('@')[0] ||
                 targetJid.split('@')[0];
 
-            const owners = Array.isArray(global.owner)
-                ? global.owner
-                : [global.owner];
+            const owners = Array.isArray(global.owners)
+                ? global.owners
+                : [global.owners];
 
             const isBotOwner = owners.some(owner => {
                 const ownerNumber = String(owner)
