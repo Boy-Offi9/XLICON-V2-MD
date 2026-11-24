@@ -6,6 +6,7 @@
  */
 
 const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+const { normalizeJid, getNumberFromJid, checkOwner, checkDev } = require('./lib/auth')
 
 const groupMetadataCache = new Map()
 const GROUP_CACHE_TTL = 10 * 60 * 1000
@@ -31,35 +32,6 @@ async function getGroupMetadata(sock, jid) {
     }
 }
 
-function normalizeJid(jid = '') {
-    return String(jid).split(':')[0]
-}
-
-function getNumberFromJid(jid = '') {
-    return normalizeJid(jid).split('@')[0]
-}
-
-function checkOwner(sender = '', sockUser = {}) {
-    const owners = Array.isArray(global.owners)
-        ? global.owners.map(normalizeJid)
-        : []
-
-    const user = normalizeJid(sender)
-
-    const botIds = [
-        normalizeJid(sockUser?.id),
-        normalizeJid(sockUser?.lid)
-    ].filter(Boolean)
-
-    return owners.includes(user) || botIds.includes(user)
-}
-
-function checkDev(sender = '') {
-    if (!global.dev || !Array.isArray(global.dev)) return false
-    const user = normalizeJid(sender)
-    const devIds = global.dev.map(normalizeJid)
-    return devIds.includes(user)
-}
 
 async function serializeMessage(sock, msg) {
     const from = msg.key?.remoteJid || ''
