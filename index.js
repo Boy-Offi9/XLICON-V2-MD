@@ -135,6 +135,38 @@ async function loadPrefix() {
     await startBot();
 }
 
+function loadPlugins() {
+    const plugins = new Map();
+    const pluginPath = path.join(__dirname, PLUGIN_FOLDER);
+
+    if (!fs.existsSync(pluginPath)) {
+        console.log('No plugins folder found');
+        return plugins;
+    }
+
+    const pluginFiles = fs.readdirSync(pluginPath).filter(file => path.extname(file).toLowerCase() === '.js');
+    for (const file of pluginFiles) {
+        try {
+            const plugin = require(path.join(pluginPath, file));
+            if (plugin.name && typeof plugin.execute === 'function') {
+                plugins.set(plugin.name.toLowerCase(), plugin);
+                if (Array.isArray(plugin.aliases)) {
+                    plugin.aliases.forEach(alias => {
+                        plugins.set(alias.toLowerCase(), plugin);
+                    });
+                }
+                console.log(`Loaded plugin: ${plugin.name}`);
+            } else {
+                console.warn(`Invalid plugin structure in ${file}`);
+            }
+        } catch (error) {
+            console.error(`Failed to load plugin ${file}:`, error.message);
+        }
+    }
+    console.log(`Total plugins loaded: ${plugins.size}`);
+    return plugins;
+}
+
 async function startBot() {
     console.log('Starting WhatsApp Bot...');
     isConnecting = true;
@@ -284,38 +316,7 @@ async function startBot() {
 
         sock.ev.on('creds.update', safeSaveCreds);
 
-        const plugins = new Map();
-        const pluginPath = path.join(__dirname, PLUGIN_FOLDER);
-            
-        if (fs.existsSync(pluginPath)) {
-            try {
-                const pluginFiles = fs.readdirSync(pluginPath).filter(file => file.endsWith('.js'));
-                    
-                for (const file of pluginFiles) {
-                    try {
-                        const plugin = require(path.join(pluginPath, file));
-                        if (plugin.name && typeof plugin.execute === 'function') {
-                            plugins.set(plugin.name.toLowerCase(), plugin);
-                            if (Array.isArray(plugin.aliases)) {
-                                plugin.aliases.forEach(alias => {
-                                    plugins.set(alias.toLowerCase(), plugin);
-                                });
-                            }
-                            console.log(`Loaded plugin: ${plugin.name}`);
-                        } else {
-                            console.warn(`Invalid plugin structure in ${file}`);
-                        }
-                    } catch (error) {
-                        console.error(`Failed to load plugin ${file}:`, error.message);
-                    }
-                }
-                console.log(`Total plugins loaded: ${plugins.size}`);
-            } catch (error) {
-                console.error('Error loading plugins:', error);
-            }
-        } else {
-            console.log('No plugins folder found');
-        }
+        const plugins = loadPlugins();
         
            
         sock.ev.on('messages.upsert', async ({ messages, type }) => {
