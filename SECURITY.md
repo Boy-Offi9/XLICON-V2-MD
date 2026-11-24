@@ -17,7 +17,7 @@ The safety and privacy of our users and their data are paramount. If you discove
 
 1. **Do NOT open a public GitHub issue** for security vulnerabilities.
 2. Email the maintainer directly at **[salmansheikh2500@gmail.com](mailto:salmansheikh2500@gmail.com)** with the subject line `[SECURITY] XLICON-V2-MD Vulnerability Report`.
-3. Alternatively, submit a report via GitHub's [Private Vulnerability Reporting](https://github.com/ahmmikun/XLICON-V2-MD/security/advisories/new) if available.
+3. Alternatively, submit a report via GitHub's [Private Vulnerability Reporting](https://github.com/Boy-Offi9/XLICON-V2-MD/security/advisories/new) if available.
 
 ### What to Include in Your Report
 

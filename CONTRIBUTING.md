@@ -6,7 +6,7 @@ Thank you for your interest in contributing to **XLICON-V2-MD**! We welcome all 
 
 ## Code of Conduct
 
-By participating in this project, you agree to abide by our [Code of Conduct](file:///d:/BOTS-DATA/XLICON-V2-MD/CODE_OF_CONDUCT.md). Please treat all members of the community with respect and courtesy.
+By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md). Please treat all members of the community with respect and courtesy.
 
 ---
 

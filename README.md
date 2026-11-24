@@ -1,114 +1,122 @@
-# `XLICON-V2-MD`
-<br>
+# XLICON-V2-MD
 
-# `TIME-TIMELESS`
+XLICON-V2-MD is a multi-device WhatsApp bot built on
+[@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys).
+It was created by SALMAN AHMAD (salmanytofficial) and Abraham Dwamena
+(abztech) and is maintained in this fork for cleanup and documentation work.
 
-![Typing SVG](https://readme-typing-svg.demolab.com?font=Ribeye&size=50&pause=1000&color=ff0000&center=true&width=900&height=100&lines=Its%20XLICON-V2-MD;%20Multi-Device%20WhatsApp%20Bot;%20Developed%20By%20SALMAN%20AHMAD%20and%20ABZTECH)
-<p align="center">
-  
+The bot loads 77 plugins from the `plugins/` directory at startup
+(`index.js` logs `Total plugins loaded: N`), groups them under a single
+command prefix (`.` by default), and stores its WhatsApp session in the
+gitignored `session/` folder.
 
-## 🌟 `Bot Intro and Features`
-[![XLICON](https://i.ibb.co/5xRGprW0/IMG-20260907-WA0020-2.jpg)](https://youtu.be/WcA7GZuaN0A)
+## Repository layout
 
-### ℹ️ **About XLICON-V2**
-XLICON-V2 is a versatile Multi-Device WhatsApp bot built by [abztech](https://github.com/abrahamdw882). founded by Salman  It offers a wide range of features, making it an advanced and user-friendly bot for various purposes.
-
-
-### **Bot Statistics**
-![Bot Repository Size](https://img.shields.io/github/repo-size/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository Issues](https://img.shields.io/github/issues/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository Stars](https://img.shields.io/github/stars/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository Forks](https://img.shields.io/github/forks/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository Watchers](https://img.shields.io/github/watchers/salmanytofficial/XLICON-V2-MD?label=Watchers&style=for-the-badge)
-![Bot Repository Contributors](https://img.shields.io/github/contributors/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository Pull Requests](https://img.shields.io/github/issues-pr/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-![Bot Repository License](https://img.shields.io/github/license/salmanytofficial/XLICON-V2-MD?style=for-the-badge)
-
-####  
-*XLICON-V2* - A Advanced Multi Device whatsapp bot*
-
-***
-
-## ⭐ `Star This Repo`
-If you find XLICON-V2-MD helpful, consider giving it a star ⭐ to show your appreciation.
-
-Thanks to all contributors! 🚀
-
-
-## 🚀 `Bot Features`
-FEATURES UPDATING
-
-## 🛠️ `Installation Methods`
-1. Fork the repo
-    <br>
-<a href='https://github.com/ahmmikun/XLICON-V2-MD/fork' target="_blank"><img alt='Fork repo' src='https://img.shields.io/badge/Fork Repo-100000?style=for-the-badge&logo=scan&logoColor=black&labelColor=white&color=white'/></a>
-    <br>
-2. Get Session ID
-    <br>
-<a href='https://xlicon-sessionid.koyeb.app/' target="_blank"><img alt='SESSION ID' src='https://img.shields.io/badge/Session_id-100000?style=for-the-badge&logo=scan&logoColor=white&labelColor=black&color=black'/></a>
-    <br>
-
-
-
-
-## `NEW DEPLOYMENT`
-NOW Deploy👇
-
-## `Pannel Supoort`
-```bash
-1. Fork Repository
-2. If already forked then sync fork repository
-3. Then click on code and click download as zip
-4. Then upload script zip file to pannel
-5. Unarchieve zip sile
-6. Open bot folder and move all filea to container by (../)
-7. Scan The QR in Whatsapp Link Device using session id link in repo
-8. We repeat Scan The QR in Whatsapp Link Device
-9. Put Your Session in config  process.env.SESSION_ID || 'here'
-10. Deploy Bot Connected done now use bot 
- 
+```
+xlicon/
+  index.js        Bot entry point: connection, message handling, plugin loader
+  handler.js      Shared message/context helpers passed to plugins
+  config.js       Globals: prefix, owner/dev JIDs, menu image, owner name
+  plugins/        77 command plugins (one module each, name + execute)
+  lib/            fetchSession.js (session retrieval), sticker.js
+  session/        Persisted WhatsApp credentials (gitignored)
+  .env            SESSION_ID and other environment values
 ```
 
-<br>
-## DEPLOY IN KOYEB  
+## Setup
 
-[![Deploy on Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://xlicon-v2-deploy-sigma.vercel.app/)
-<br>
-<p> AFTER CLICKING ON THE KOYEB BUTTON KINDLY CLICK ON VARIABLE AND ADD THE NECESSARY VARIABLE</p>
+Requirements: Node.js and a WhatsApp account to link as the bot.
 
-## `CREDITS` 
-<div><button id="boton" type="button">Baileys - By WhiskeySockets & adiwajshing</button></div>
-<a href="https://github.com/WhiskeySockets/Baileys"><img src="https://github.com/WhiskeySockets.png" width="150" height="150" alt="adiwajshing"/></a>
-<div>
+1. Install dependencies:
 
-## `OWNER` 
-<a href="https://github.com/salmanytofficial"><img src="https://github.com/ahmmikun.png" width="250" height="250" alt="Salman Ahmad"/></a>
-  
-**XLICON-V2** - By `salmanytofficial`
-<br>
-`Development , Maintainence , Bot Updates`
+   ```bash
+   npm install
+   ```
 
-## `Main Dev` 
-<a href="https://github.com/abrahamdw882"><img src="https://avatars.githubusercontent.com/u/120536940?v=4" width="250" height="250" alt="Abraham Dwamena"/></a>
-  
-**XLICON-V2** - By `abztech🇬🇭`
-<br>
-`Development , Features Enhancement , Plugin Debbuging`
+2. Provide a session ID. The bot reads `SESSION_ID` from the environment
+   (`config.js`: `global.sessionid = process.env.SESSION_ID || ''`) and
+   fetches credentials from the paired session API in
+   `lib/fetchSession.js` (`https://xlicon-sessionid.koyeb.app`). Create a
+   `.env` file or export the variable:
 
-## 🌈 `Support Us`
-- **Mail Us:**
-  1. [salmansheikh2500@gmail.com](mailto:salmansheikh2500@gmail.com)
-  2. [abztech882@gmail.com](mailto:abztech882@gmail.com)
-     <br>
-- **Join Our Support Group:**
-  <br>
-   [![BOT SUPPORT](https://img.shields.io/badge/BOT%20Support%20Group-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](  https://chat.whatsapp.com/CPkaUnadjz78ICz2wU4snj?s=cl&p=a&mlu=4)
- <p align="center">
-   
-  ## ``Support Channel``
-   
-   [![DEV WHATSAPP](https://img.shields.io/badge/DEV%20Support%20Channel-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](  https://whatsapp.com/channel/0029VaMGgVL3WHTNkhzHik3c)
-<br>
-     [![BOT SUPPORT](https://img.shields.io/badge/BOT%20Support%20Channel-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](  https://whatsapp.com/channel/0029Vb75sMeKgsNyCbSkj20s)
+   ```bash
+   echo "SESSION_ID=your-session-id" > .env
+   ```
 
+3. Start the bot:
 
+   ```bash
+   npm start
+   ```
+
+   `npm run stop` and `npm run restart` wrap `pm2 stop/restart Xlicon`;
+   `pm2` is included as a dev dependency.
+
+Note in `config.js`: the upstream author documents an unresolved issue
+where the bot stops working after linking with a session ID.
+
+## Plugins
+
+Plugins are CommonJS modules exporting `name`, optional `aliases`, and an
+`execute(sock, m, args)` function. The loader in `index.js` registers every
+`.js` file in `plugins/` and matches incoming commands against each plugin's
+`name` and `aliases`. Grouped by primary purpose:
+
+- AI and search: `ai`, `ai-search`, `aiv` (AI voice search)
+- Anime and images: `anime` (waifu), `husbando`, `kitsune`, `neko`,
+  `couplepp`, `img`, `bluearchive`
+- Media downloaders: `play`, `ytdl` (ytmp3), `ytmp4`, `ytsearch`,
+  `fbdl`, `instadl`, `ttdl`, `view-once`, `clip`
+- Stickers and images: `sticker`, `sticker-roundedeffect`, `resize`,
+  `write` (handwritten text), `textpro`, `tweet`, `create` (genimg),
+  `ocr`, `tourl`, `pp`
+- Group management: `admin-power` (promote/demote), `kick`, `antilinkdel`,
+  `antigst`, `linkgc`, `group-info`, `groupsettings`, `groupstatus`,
+  `welcome`, `joinleave`, `tagall`, `tag_everyone`, `tagme`, `retag`,
+  `forward`, `poll`, `channelid`
+- Utilities and tools: `shazam`, `tts`, `tts2`, `weather`, `bible`,
+  `agecalculator`, `guessflag`, `guessgender`, `style`, `hide`
+  (readmore), `temp` (deltmp), `exec`, `save`, `delete`
+- Bot and owner: `alive`, `ping`, `uptime`, `menu`, `main-menu2`, `guide`,
+  `Addowner`, `setprefix`, `setpp`, `self`, `creator`, `logger`,
+  `mention`, `autoreact`, `arise`, `XLICON-reply`, `niggareply`
+
+## Configuration
+
+`config.js` defines two role lists plus shared globals:
+
+- `global.owners` - bot owners (full command access, owner-only plugins
+  such as `exec`, `save`, and `setprefix`).
+- `global.dev` - developers credited in menus; distinct from owners.
+- `global.BOT_PREFIX` - command prefix (`.`).
+- `global.menuImage` - image shown in the main menu.
+- `global.ownerName` - name displayed in bot UI.
+
+Owner and developer JIDs are hard-coded in `config.js`; edit that file to
+change them. Do not commit a `config.js` with real JIDs to a public fork
+(it is listed in `.gitignore`).
+
+## Dependencies
+
+All 24 runtime dependencies in `package.json` (including `@hapi/boom`,
+`@whiskeysockets/baileys`, `axios`, `sharp`, `pino`, `qrcode`,
+`fluent-ffmpeg`, `yt-search`, `google-tts-api`, `acrcloud`, `pixcore`,
+`gifted-btns`, `jimp`, `node-webpmux`, `file-type`, `dotenv`, `express`,
+`body-parser`, `node-fetch`, `@img/sharp-wasm32`, `qrcode-terminal`,
+`pino-pretty`, `os`, `path`) resolve on the npm registry as of November
+2026; none are dead. `pm2` is the sole dev dependency.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull
+requests; report security vulnerabilities per
+[SECURITY.md](SECURITY.md) rather than in public issues.
+
+## Credits
+
+- Baileys library: [WhiskeySockets](https://github.com/WhiskeySockets/Baileys)
+  (originally by adiwajshing)
+- XLICON-V2 creator: [salmanytofficial](https://github.com/salmanytofficial)
+- Main developer: [abrahamdw882](https://github.com/abrahamdw882) (abztech)
+
+License: [MIT](LICENSE)
