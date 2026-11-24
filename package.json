@@ -8,7 +8,8 @@
     "start": "node index.js",
     "stop": "pm2 stop Xlicon",
     "restart": "pm2 restart Xlicon",
-    "bot": "node index.js"
+    "bot": "node index.js",
+    "test": "node --test tests/*.test.js"
   },
   "author": "Xlicon",
   "license": "MIT",
