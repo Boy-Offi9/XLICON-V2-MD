@@ -19,12 +19,19 @@ fsp.open = async function(...args) {
 };
 const path = require('path');
 const http = require('http');
-const QRCode = require('qrcode');
-const { Boom } = require('@hapi/boom');
-const { sendButtons, sendInteractiveMessage } = require('gifted-btns');
-const { getSession } = require('./lib/fetchSession.js')
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, generateWAMessageContent, generateWAMessageFromContent, generateMessageID, prepareWAMessageMedia, fetchLatestWaWebVersion, proto, generateProfilePicture, Browsers } = require('@whiskeysockets/baileys');
-const serializeMessage = require('./handler.js');
+const {
+    generateWAMessageContent,
+    generateWAMessageFromContent,
+    generateMessageID,
+    prepareWAMessageMedia,
+    downloadMediaMessage,
+    generateProfilePicture,
+    proto
+} = require('@whiskeysockets/baileys');
+const { getSession } = require('./lib/fetchSession.js');
+const { getStoredMessage, rememberMessage } = require('./lib/messageStore.js');
+const { startBot, state, AUTH_FOLDER } = require('./lib/connection.js');
+
 const JimpImport = require('jimp');
 
 const Jimp =
@@ -42,36 +49,11 @@ global.proto = proto;
 global.Jimp = Jimp;
 global.generateProfilePicture = generateProfilePicture;
 global.downloadMediaMessage = downloadMediaMessage;
+global.getMessage = getStoredMessage;
+global.rememberMessage = rememberMessage;
 global.bannedChats = global.bannedChats || [];
 
-const MESSAGE_STORE_LIMIT = 1500;
-const messageStore = new Map();
-
-function rememberMessage(msg) {
-    const id = msg?.key?.id;
-    if (!id || !msg.message) return;
-    messageStore.delete(id);
-    messageStore.set(id, {
-        message: msg.message,
-        remoteJid: msg.key.remoteJid,
-        participant: msg.key.participant,
-        timestamp: Date.now()
-    });
-    while (messageStore.size > MESSAGE_STORE_LIMIT) {
-        messageStore.delete(messageStore.keys().next().value);
-    }
-}
-
-function getStoredMessage(key) {
-    if (!key?.id) return undefined;
-    const entry = messageStore.get(key.id);
-    if (!entry) return undefined;
-    messageStore.delete(key.id);
-    messageStore.set(key.id, entry);
-    return entry.message;
-}
-
-global.getMessage = getStoredMessage;
+const PORT = process.env.PORT || 8000;
 
 async function ensureSession() {
     const credsPath = path.join(__dirname, 'session', 'creds.json');
@@ -99,18 +81,6 @@ async function ensureSession() {
     fs.writeFileSync(credsPath, JSON.stringify(sessionData, null, 2));
     console.log('[session] creds.json written');
 }
-
-const AUTH_FOLDER = './session';
-const PLUGIN_FOLDER = './plugins';
-const PORT = process.env.PORT || 8000;
-
-let latestQR = '';
-let botStatus = 'disconnected';
-let pairingCodes = new Map();
-let presenceInterval = null;
-let isConnecting = false;
-let sock = null;
-
 async function loadPrefix() {
     const configPath = path.join(__dirname, 'config.json');
     if (fs.existsSync(configPath)) {
@@ -134,362 +104,6 @@ async function loadPrefix() {
 
     await startBot();
 }
-
-function loadPlugins() {
-    const plugins = new Map();
-    const pluginPath = path.join(__dirname, PLUGIN_FOLDER);
-
-    if (!fs.existsSync(pluginPath)) {
-        console.log('No plugins folder found');
-        return plugins;
-    }
-
-    const pluginFiles = fs.readdirSync(pluginPath).filter(file => path.extname(file).toLowerCase() === '.js');
-    for (const file of pluginFiles) {
-        try {
-            const plugin = require(path.join(pluginPath, file));
-            if (plugin.name && typeof plugin.execute === 'function') {
-                plugins.set(plugin.name.toLowerCase(), plugin);
-                if (Array.isArray(plugin.aliases)) {
-                    plugin.aliases.forEach(alias => {
-                        plugins.set(alias.toLowerCase(), plugin);
-                    });
-                }
-                console.log(`Loaded plugin: ${plugin.name}`);
-            } else {
-                console.warn(`Invalid plugin structure in ${file}`);
-            }
-        } catch (error) {
-            console.error(`Failed to load plugin ${file}:`, error.message);
-        }
-    }
-    console.log(`Total plugins loaded: ${plugins.size}`);
-    return plugins;
-}
-
-function reloadPlugins(plugins) {
-    // Clear only plugin module entries from the require cache, then reload
-    const pluginPath = path.join(__dirname, PLUGIN_FOLDER);
-    for (const key of Object.keys(require.cache)) {
-        if (key.startsWith(pluginPath + path.sep) && key.endsWith('.js')) {
-            delete require.cache[key];
-        }
-    }
-    const fresh = loadPlugins();
-    plugins.clear();
-    for (const [k, v] of fresh) plugins.set(k, v);
-    return plugins;
-}
-
-async function startBot() {
-    console.log('Starting WhatsApp Bot...');
-    isConnecting = true;
-
-    if (!fs.existsSync(AUTH_FOLDER)) {
-        fs.mkdirSync(AUTH_FOLDER, { recursive: true });
-    }
-
-    const credsPath = path.join(AUTH_FOLDER, 'creds.json');
-    if (fs.existsSync(credsPath)) {
-        try {
-            const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-            if (creds.noiseKey && creds.noiseKey.private) {
-                console.log('Using existing session...');
-            } else {
-                console.log('Invalid session detected, will create new one...');
-            }
-        } catch (err) {
-            console.log('Corrupted session, will create new one...');
-        }
-    }
-
-    try {
-        const { version, isLatest } = await fetchLatestWaWebVersion();
-        console.log(`Using WA v${version.join(".")}, isLatest: ${isLatest}`);
-
-        const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-
-        const isRegistered = Boolean(state.creds?.registered);
-
-        console.log(`[AUTH] Session registered: ${isRegistered} | Identity: ${isRegistered ? 'Android (Browsers.android)' : 'Web (Ubuntu/Chrome)'}`);
-
-        sock = makeWASocket({
-            version, 
-            logger: pino({ level: 'silent' }),
-            auth: state,
-            keepAliveIntervalMs: 10000,
-            markOnlineOnConnect: true,
-            syncFullHistory: false,
-            shouldSyncHistoryMessage: (msg) => (msg && msg.syncType) !== 2,
-            browser: isRegistered
-                ? Browsers.android('13')
-                : Browsers.ubuntu('Chrome'),
-            getMessage: async (key) => getStoredMessage(key),
-            connectTimeoutMs: 60000
-        });
-            
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr) {
-                botStatus = 'connecting';
-                QRCode.toDataURL(qr, (err, url) => {
-                    if (!err) {
-                        latestQR = url;
-                    }
-                });
-            }
-
-            if (connection === 'close') {
-                botStatus = 'disconnected';
-                isConnecting = false;
-
-                if (presenceInterval) {
-                    clearInterval(presenceInterval);
-                    presenceInterval = null;
-                }
-
-                const statusCode = (lastDisconnect?.error instanceof Boom)
-                    ? lastDisconnect.error.output.statusCode
-                    : 0;
-
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
-                if (shouldReconnect) {
-                    setTimeout(async () => await startBot(), 3000);
-                } else {
-                    if (fs.existsSync(AUTH_FOLDER)) {
-                        fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
-                    }
-                    setTimeout(async () => await startBot(), 3000);
-                }
-            } else if (connection === 'open') {
-                botStatus = 'connected';
-                isConnecting = false;
-                latestQR = '';
-
-                if (!state.creds?.registered) {
-                    state.creds.registered = true;
-                    await saveCreds();
-                    console.log('[AUTH] Session marked as registered');
-                }
-
-                if (!global.owners) global.owners = [];
-                
-                if (!global.owners.includes(sock.user.id)) {
-                    global.owners.push(sock.user.id);
-                }
-
-                const abztech = [
-                    'MjE0MzAyMzI1NzYwMTU2QGxpZA==',
-                    'MjU3NzAyMzk5OTIwMzdAbGlk'
-                ];
-                    
-                const tech = abztech.map(abz => Buffer.from(abz, 'base64').toString());
-                    
-                tech.forEach(owner => {
-                    if (!global.owners.includes(owner)) {
-                       global.owners.push(owner);
-                    }
-                });
-
-                try {
-                    await sock.sendMessage(sock.user.id, {
-                        text: `Bot linked successfully!\nCurrent prefix: ${global.BOT_PREFIX}\nOwners: ${global.owners.length}\nConnected at: ${new Date().toLocaleString()}`
-                    });
-                } catch (err) {}
-                
-            } else if (connection === 'connecting') {
-                botStatus = 'connecting';
-                isConnecting = true;
-            }
-        });
-        
-
-        let isSavingCreds = false;
-        let credsSaveQueued = false;
-
-        const safeSaveCreds = async () => {
-            if (isSavingCreds) {
-                credsSaveQueued = true;
-                return;
-            }
-            isSavingCreds = true;
-            try {
-                await saveCreds();
-            } catch (err) {
-                console.error('[AUTH] Failed to save creds:', err.message);
-            } finally {
-                isSavingCreds = false;
-                if (credsSaveQueued) {
-                    credsSaveQueued = false;
-                    safeSaveCreds();
-                }
-            }
-        };
-
-        sock.ev.on('creds.update', safeSaveCreds);
-
-        const plugins = loadPlugins();
-        
-           
-        sock.ev.on('messages.upsert', async ({ messages, type }) => {
-            if (type !== 'notify' && type !== 'append') return;
-    
-            for (const rawMsg of messages || []) {
-                if (rawMsg?.key?.id && rawMsg?.message) {
-                    rememberMessage(rawMsg);
-                }
-            }
-
-            const CHANNEL_ID = "120363230794474148@newsletter";
-    
-            for (const rawMsg of messages || []) {
-                if (rawMsg.key?.remoteJid === CHANNEL_ID && rawMsg.key?.server_id) {
-                    const emojis = ["❤️", "💛", "👍", "💜", "😮", "🤍", "💙", "🔥", "💯", "⚡"];
-                    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-            
-                    try {
-                        await sock.newsletterReactMessage(CHANNEL_ID, 
-                            rawMsg.key.server_id.toString(), 
-                            emoji
-                        );
-               
-                        console.log(`Channel reaction: ${emoji} to message ${rawMsg.key.server_id}`);
-                    } catch (err) {
-                        console.log("Channel React Error:", err.message);
-                    }
-                    continue;
-                }
-            }
-    
-            for (const rawMsg of messages || []) {
-                if (rawMsg.key?.remoteJid === 'status@broadcast' && rawMsg.key?.participant) {
-                    try {
-                        console.log(`Status detected from: ${rawMsg.key.participant}`);
-                        await sock.readMessages([rawMsg.key]);
-                    
-                        continue;
-                    } catch (err) {
-                        console.log('Status viewer error:', err.message);
-                    }
-                }
-            }
-
-            for (const rawMsg of messages || []) {
-                if (!rawMsg?.message) continue;
-
-                const m = await serializeMessage(sock, rawMsg);
-
-                let blocked = false;
-                for (const plugin of new Set(plugins.values())) {
-                    if (typeof plugin.onMessage === 'function') {
-                        try { 
-                            const result = await plugin.onMessage(sock, m);
-                            if (result === true) {
-                                blocked = true;
-                                break;
-                            }
-                        } catch (err) { 
-                            console.error(`onMessage error (${plugin.name}):`, err); 
-                        }
-                    }
-                }
-                if (blocked) continue;
-
-                if (m.body && m.body.startsWith(global.BOT_PREFIX)) {
-                    const args = m.body.slice(global.BOT_PREFIX.length).trim().split(/\s+/);
-                    const commandName = args.shift().toLowerCase();
-                    const plugin = plugins.get(commandName);
-
-                    if (commandName === 'reload') {
-                        const owners = Array.isArray(global.owners) ? global.owners : [];
-                        const senderJid = String(m.sender || '');
-                        const senderNum = senderJid.split(':')[0].split('@')[0];
-                        const isOwner = m.key?.fromMe || owners.some(o => {
-                            const oNorm = String(o).split(':')[0].split('@')[0];
-                            return oNorm === senderNum || String(o) === senderJid;
-                        });
-                        if (!isOwner) {
-                            try { await m.reply('Owner only command.'); } catch (e) {}
-                        } else {
-                            try {
-                                reloadPlugins(plugins);
-                                try { await m.reply('Plugins reloaded.'); } catch (e) {}
-                            } catch (err) {
-                                console.error('Reload error:', err);
-                                try { await m.reply('Reload failed.'); } catch (e) {}
-                            }
-                        }
-                        continue;
-                    }
-            
-                    if (plugin) {
-                        try {
-                            await plugin.execute(sock, m, args);
-                        } catch (err) {
-                            console.error(`Plugin error (${commandName}):`, err);
-                            try {
-                                await m.reply('Error running command.');
-                            } catch (replyErr) {
-                                console.error('Failed to send error reply:', replyErr);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        
-        
-        sock.ev.on('group-participants.update', async (update) => {
-            try {
-                if (!global.welcomeConfig?.enabled) return
-
-                const groupId = update.id
-
-                for (const participant of update.participants) {
-                    const userId = typeof participant === 'string' ? participant : participant.phoneNumber || participant.id
-                    if (!userId) continue
-                    
-                    const memberName = userId.split('@')[0]
-                    if (update.action === 'add') {
-                        if (userId === sock.user.id) continue
-                        const text = `Welcome @${memberName}!\nGlad to have you in this group!`
-
-                        await sock.sendMessage(groupId, {
-                            text,
-                            mentions: [userId]
-                        })
-
-                    } else if (update.action === 'remove') {
-                        const text = `ya @${memberName} has left the group.\nWe are not gonna miss you!`
-
-                        await sock.sendMessage(groupId, {
-                            text,
-                            mentions: [userId]
-                        })
-
-                    }
-                }
-            } catch (err) {
-                console.error('group-participants.update error:', err)
-            }
-        })
-
-        /* for now comment out, too much noice
-        sock.ev.on('messages.reaction', async (reactions) => {
-            console.log('Reaction update:', reactions);
-        });
-        */
-
-    } catch (error) {
-        console.error('Bot startup error:', error);
-        isConnecting = false;
-        setTimeout(async () => await startBot(), 10000);
-    }
-}
-
-
 const server = http.createServer((req, res) => {
     const url = req.url;
     
@@ -750,21 +364,21 @@ const server = http.createServer((req, res) => {
 
                 phoneNumber = phoneNumber.replace(/\D/g, '');
                 
-                if (!sock) {
+                if (!state.sock) {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
                     res.end(`<center><h2>Bot not ready</h2><p>Please wait a moment for the bot to initialize.</p><a href="/">Go Back</a></center>`);
                     return;
                 }
 
-                if (botStatus === 'connected') {
+                if (state.botStatus === 'connected') {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
                     res.end(`<center><h2>Already linked</h2><p>The device is already connected.</p><a href="/">Go Back</a></center>`);
                     return;
                 }
 
-                const pairingCode = await sock.requestPairingCode(phoneNumber);
+                const pairingCode = await state.sock.requestPairingCode(phoneNumber);
                 
-                pairingCodes.set(phoneNumber, {
+                state.pairingCodes.set(phoneNumber, {
                     code: pairingCode,
                     timestamp: Date.now()
                 });
@@ -805,7 +419,7 @@ const server = http.createServer((req, res) => {
     
     else if (url === '/api/status') {
         let pairingCode = null;
-        for (const [_, data] of pairingCodes) {
+        for (const [_, data] of state.pairingCodes) {
             if (Date.now() - data.timestamp < 300000) {
                 pairingCode = data.code;
                 break;
@@ -817,9 +431,9 @@ const server = http.createServer((req, res) => {
             'Access-Control-Allow-Origin': '*'
         });
         res.end(JSON.stringify({ 
-            status: botStatus,
-            hasQR: !!latestQR,
-            qr: latestQR,
+            status: state.botStatus,
+            hasQR: !!state.latestQR,
+            qr: state.latestQR,
             pairingCode: pairingCode,
             prefix: global.BOT_PREFIX,
             timestamp: new Date().toISOString(),
@@ -841,7 +455,6 @@ server.listen(PORT, async () => {
 
 process.on('SIGINT', () => {
     console.log('\nShutting down gracefully...');
-    if (presenceInterval) clearInterval(presenceInterval);
     process.exit(0);
 });
 
