@@ -1,3 +1,5 @@
+const { checkOwner } = require('../lib/auth')
+
 const util = require('util')
 const axios = require('axios')
 const Jimp = global || require('jimp')
@@ -18,7 +20,15 @@ module.exports = {
         sentOnce.add(m.id)
 
         try {
-            if (!m.isOwner) return
+            // Strict owner-only gate: re-checked independently of the
+            // serialized m.isOwner flag, using the same normalizeJid/checkOwner
+            // logic as handler.js (lid vs s.whatsapp.net safe).
+            const sender =
+                m.key?.fromMe
+                    ? (sock?.user?.id || sock?.user?.lid || '')
+                    : (m.key?.participant || m.key?.remoteJid || m.sender || '')
+
+            if (!checkOwner(sender, sock?.user)) return
 
             const code = m.text.slice(1).trim()
 
