@@ -1,3 +1,4 @@
+const { checkOwner } = require('../lib/auth');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -7,7 +8,7 @@ module.exports = {
     description: 'Change the command prefix (Owner only)',
 
     async execute(sock, m, args) {
-        if (!global.owners.includes(m.sender)) {
+        if (!checkOwner(m.sender || '', sock?.user)) {
             return m.reply('❌ You are not allowed to change the prefix.');
         }
 
