@@ -388,11 +388,15 @@ async function startBot() {
                     const plugin = plugins.get(commandName);
             
                     if (plugin) {
-                        try { 
-                            await plugin.execute(sock, m, args); 
-                        } catch (err) { 
-                            console.error(`Plugin error (${commandName}):`, err); 
-                            await m.reply('Error running command.'); 
+                        try {
+                            await plugin.execute(sock, m, args);
+                        } catch (err) {
+                            console.error(`Plugin error (${commandName}):`, err);
+                            try {
+                                await m.reply('Error running command.');
+                            } catch (replyErr) {
+                                console.error('Failed to send error reply:', replyErr);
+                            }
                         }
                     }
                 }
